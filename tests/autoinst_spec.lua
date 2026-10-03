@@ -1,0 +1,185 @@
+local file = require("verilog.file")
+local query = require("verilog.query")
+local template = require("verilog.template")
+
+local fixture_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h")
+	.. "/fixtures"
+
+local function load_fixture(name)
+	local path = fixture_dir .. "/" .. name
+	local buf = file.read_file_into_new_buffer(path, true)
+	assert(buf, "failed to load fixture " .. path)
+	return buf
+end
+
+local function with_fixture(name, fn)
+	local buf = load_fixture(name)
+	local ok_, err_ = pcall(fn, buf)
+	if vim.api.nvim_buf_is_valid(buf) then
+		vim.api.nvim_buf_delete(buf, { force = true })
+	end
+	if not ok_ then
+		error(err_)
+	end
+end
+
+describe("read_file_into_new_buffer", function()
+	it("returns nil when the file cannot be opened", function()
+		local result = file.read_file_into_new_buffer("/nonexistent/path.sv", true)
+		assert.is_nil(result)
+	end)
+
+	it("returns a valid buffer for an existing file", function()
+		with_fixture("simple.sv", function(buf)
+			assert.is_number(buf)
+			assert.is_true(vim.api.nvim_buf_is_valid(buf))
+		end)
+	end)
+end)
+
+describe("get_modules_from_buffer", function()
+	it("returns one module for a single-module file", function()
+		with_fixture("simple.sv", function(buf)
+			assert.equals(1, #query.get_modules_from_buffer(buf))
+		end)
+	end)
+
+	it("returns multiple modules from a multi-module file", function()
+		with_fixture("multi.sv", function(buf)
+			assert.equals(2, #query.get_modules_from_buffer(buf))
+		end)
+	end)
+
+	it("includes interface declarations", function()
+		with_fixture("interface.sv", function(buf)
+			assert.equals(1, #query.get_modules_from_buffer(buf))
+		end)
+	end)
+end)
+
+describe("get_ports_from_buffer", function()
+	it("returns 4 ANSI ports for the simple fixture", function()
+		with_fixture("simple.sv", function(buf)
+			assert.equals(4, #query.get_ports_from_buffer(buf))
+		end)
+	end)
+
+	it("returns 4 non-ANSI ports", function()
+		with_fixture("nonansi.v", function(buf)
+			assert.equals(4, #query.get_ports_from_buffer(buf))
+		end)
+	end)
+end)
+
+describe("get_parameters_from_buffer", function()
+	it("returns 0 for a no-param module", function()
+		with_fixture("simple.sv", function(buf)
+			assert.equals(0, #query.get_parameters_from_buffer(buf))
+		end)
+	end)
+
+	it("returns 2 parameters from the parameterized fixture", function()
+		with_fixture("parameterized.sv", function(buf)
+			assert.equals(2, #query.get_parameters_from_buffer(buf))
+		end)
+	end)
+end)
+
+describe("get_port_breakdown", function()
+	it("breaks down an ANSI input port", function()
+		with_fixture("simple.sv", function(buf)
+			local ports = query.get_ports_from_buffer(buf)
+			local dir, _, name = query.get_port_breakdown(ports[1], buf)
+			assert.equals("input", dir)
+			assert.equals("clk", name)
+		end)
+	end)
+
+	it("breaks down an ANSI output port", function()
+		with_fixture("simple.sv", function(buf)
+			local ports = query.get_ports_from_buffer(buf)
+			local dir, _, name = query.get_port_breakdown(ports[4], buf)
+			assert.equals("output", dir)
+			assert.equals("data_out", name)
+		end)
+	end)
+
+	it("breaks down a non-ANSI port", function()
+		with_fixture("nonansi.v", function(buf)
+			local ports = query.get_ports_from_buffer(buf)
+			local dir, _, name = query.get_port_breakdown(ports[1], buf)
+			assert.equals("input", dir)
+			assert.equals("clk", name)
+		end)
+	end)
+end)
+
+describe("generate_module_instantiation", function()
+	it("template starts with the module type name", function()
+		with_fixture("simple.sv", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf)
+			assert.is_not_nil(result)
+			assert.matches("^simple%s", result)
+		end)
+	end)
+
+	it("includes every port as an empty named connection", function()
+		with_fixture("simple.sv", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf)
+			for _, port in ipairs({ "clk", "rst_n", "data_in", "data_out" }) do
+				assert.matches("%." .. port .. "%s*%(%s*%)", result)
+			end
+		end)
+	end)
+
+	it("uses default instance name u_<module>", function()
+		with_fixture("simple.sv", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf)
+			assert.matches("u_simple", result)
+		end)
+	end)
+
+	it("uses a custom instance name when provided", function()
+		with_fixture("simple.sv", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf, "my_inst")
+			assert.matches("my_inst", result)
+			assert.is_nil(result:match("u_simple"))
+		end)
+	end)
+
+	it("emits a parameter list with name and default value", function()
+		with_fixture("parameterized.sv", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf)
+			assert.matches("%.WIDTH%(8%)", result)
+			assert.matches("%.DEPTH%(16%)", result)
+		end)
+	end)
+
+	it("handles type parameters alongside value parameters", function()
+		with_fixture("type_param_iface.sv", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf)
+			assert.is_not_nil(result)
+			-- All three parameters appear; type params are passed through with their default expression.
+			assert.matches("%.DATA_TYPE%(logic %[31:0%]%)", result)
+			assert.matches("%.USER_TYPE%(logic %[31:0%]%)", result)
+			assert.matches("%.ENABLE_LOGGING%(1'b0%)", result)
+		end)
+	end)
+
+	it("handles non-ANSI port declarations", function()
+		with_fixture("nonansi.v", function(buf)
+			local mods = query.get_modules_from_buffer(buf)
+			local result = template.generate_module_instantiation(mods[1], buf)
+			assert.is_not_nil(result)
+			for _, port in ipairs({ "clk", "rst", "data_in", "data_out" }) do
+				assert.matches("%." .. port .. "%s*%(%s*%)", result)
+			end
+		end)
+	end)
+end)
