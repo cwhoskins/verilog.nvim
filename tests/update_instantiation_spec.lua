@@ -1,4 +1,5 @@
 local instantiate = require("verilog.instantiate")
+local ts = require("verilog.ts")
 
 local fixture_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h")
 	.. "/fixtures"
@@ -29,10 +30,10 @@ local function run_in_buffer(lines, cursor, fn)
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 	vim.api.nvim_set_current_buf(buf)
 	vim.bo[buf].filetype = "verilog"
-	vim.treesitter.start(buf, "verilog")
+	vim.treesitter.start(buf, ts.lang)
 	-- Force a synchronous parse; on fresh scratch buffers the parser is otherwise
 	-- not ready when the cursor lookup first asks for it.
-	vim.treesitter.get_parser(buf, "verilog"):parse()
+	vim.treesitter.get_parser(buf, ts.lang):parse()
 	vim.api.nvim_win_set_cursor(0, cursor)
 
 	local ok, err = pcall(fn, buf)

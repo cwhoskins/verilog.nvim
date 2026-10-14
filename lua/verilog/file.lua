@@ -1,6 +1,7 @@
 local M = {}
 
 local Util = require("verilog.util")
+local ts = require("verilog.ts")
 
 function M.read_file_into_new_buffer(file_name, is_path)
 	is_path = is_path or false
@@ -25,7 +26,7 @@ function M.read_file_into_new_buffer(file_name, is_path)
 		table.insert(lines, line)
 	end
 	vim.api.nvim_buf_set_text(new_buffer, 0, 0, 0, 0, lines)
-	vim.treesitter.start(new_buffer, "verilog")
+	vim.treesitter.start(new_buffer, ts.lang)
 	return new_buffer
 end
 

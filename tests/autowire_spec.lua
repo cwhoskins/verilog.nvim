@@ -1,4 +1,5 @@
 local autowire = require("verilog.autowire")
+local ts = require("verilog.ts")
 
 local fixture_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h")
 	.. "/fixtures"
@@ -11,8 +12,8 @@ local function run_in_buffer(lines, fn)
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 	vim.api.nvim_set_current_buf(buf)
 	vim.bo[buf].filetype = "verilog"
-	vim.treesitter.start(buf, "verilog")
-	vim.treesitter.get_parser(buf, "verilog"):parse()
+	vim.treesitter.start(buf, ts.lang)
+	vim.treesitter.get_parser(buf, ts.lang):parse()
 	-- Place cursor inside the parent module so find_target_module finds it.
 	vim.api.nvim_win_set_cursor(0, { 1, 0 })
 

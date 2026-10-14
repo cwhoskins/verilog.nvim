@@ -23,10 +23,11 @@ auto-declare wires, wire flat ports to an interface, and edit synthesis attribut
 ## Requirements
 
 - Neovim **0.10+**
-- The tree-sitter `verilog` parser. The plugin only uses Neovim's built-in `vim.treesitter` API, so any way of
+- The tree-sitter `systemverilog` parser. The plugin only uses Neovim's built-in `vim.treesitter` API, so any way of
   installing the parser works; the usual one is [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter)
-  (either the `master` or `main` branch) with `:TSInstall verilog`. The plugin always parses with `verilog`, including
-  in `systemverilog` buffers
+  with `:TSInstall systemverilog`. The plugin always parses with `systemverilog`, including in `verilog` buffers.
+  Older nvim-treesitter versions call the same parser `verilog`; the plugin falls back to it when `systemverilog` is
+  not installed
 - [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) (and its dependency
   [plenary.nvim](https://github.com/nvim-lua/plenary.nvim))
 - [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) on your `PATH`, used by the `:AutoInst` file picker
@@ -47,7 +48,7 @@ Replace `OWNER/verilog.nvim` below with the repository's actual location.
   dependencies = {
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope.nvim",
-    { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" }, -- provides the verilog parser
+    { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" }, -- provides the systemverilog parser
   },
   config = function()
     require("verilog").setup({
@@ -66,7 +67,7 @@ use({
   requires = {
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope.nvim",
-    { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" }, -- provides the verilog parser
+    { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" }, -- provides the systemverilog parser
   },
   config = function()
     require("verilog").setup()
@@ -477,12 +478,12 @@ require("conform").setup({
 :checkhealth verilog
 ```
 
-This checks the Neovim version, telescope.nvim, the `verilog` parser, and `rg`.
+This checks the Neovim version, telescope.nvim, the `systemverilog` parser, and `rg`.
 
 ## Running the tests
 
 The tests use [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)'s busted runner. `plenary.nvim`,
-`telescope.nvim`, and `nvim-treesitter` (for the `verilog` parser) must be installed somewhere `tests/minimal_init.lua`
+`telescope.nvim`, and `nvim-treesitter` (for the `systemverilog` parser) must be installed somewhere `tests/minimal_init.lua`
 can find them (lazy.nvim's data directory or `site/pack/*/{start,opt}`).
 
 ```sh

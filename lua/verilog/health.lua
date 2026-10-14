@@ -10,13 +10,6 @@ local function has_module(name)
 	return pcall(require, name)
 end
 
--- language.add throws on 0.10 but returns nil, err on 0.11+ when the parser is
--- missing, so confirm with inspect, which errors on an unloaded language.
-local function has_ts_lang(lang)
-	pcall(vim.treesitter.language.add, lang)
-	return (pcall(vim.treesitter.language.inspect, lang))
-end
-
 function M.check()
 	start("verilog.nvim")
 
@@ -32,11 +25,16 @@ function M.check()
 		err("telescope.nvim not found", { "Install nvim-telescope/telescope.nvim" })
 	end
 
-	if has_ts_lang("verilog") then
-		ok("treesitter verilog parser available")
+	local ts = require("verilog.ts")
+	if ts.has_lang("systemverilog") then
+		ok("treesitter systemverilog parser available")
+	elseif ts.has_lang("verilog") then
+		warn("using the old treesitter verilog parser", {
+			"nvim-treesitter renamed it to systemverilog; update nvim-treesitter and run :TSInstall systemverilog",
+		})
 	else
-		err("treesitter verilog parser not available", {
-			"Install it with nvim-treesitter (:TSInstall verilog) or put verilog.so in a parser/ directory on 'runtimepath'",
+		err("treesitter systemverilog parser not available", {
+			"Install it with nvim-treesitter (:TSInstall systemverilog) or put systemverilog.so in a parser/ directory on 'runtimepath'",
 		})
 	end
 
